@@ -55,6 +55,9 @@ builder.Services.AddSingleton<SubsonicResponseBuilder>();
 builder.Services.AddSingleton<SubsonicModelMapper>();
 builder.Services.AddScoped<SubsonicProxyService>();
 
+//last fm
+builder.Services.AddHttpClient<LastFmService>();
+
 // Lyrics lookup (LRCLIB). Always registered; gated at runtime by Lyrics:Enabled.
 var lyricsSettings = new LyricsSettings();
 builder.Configuration.GetSection("Lyrics").Bind(lyricsSettings);
