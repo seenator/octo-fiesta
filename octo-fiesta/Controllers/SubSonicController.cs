@@ -47,6 +47,7 @@ public class SubsonicController : ControllerBase
         SubsonicProxyService proxyService,
         IHostApplicationLifetime hostApplicationLifetime,
         ILogger<SubsonicController> logger,
+        LastFmService lastFmService,
         PlaylistSyncService? playlistSyncService = null,
         ILyricsService? lyricsService = null)
     {
