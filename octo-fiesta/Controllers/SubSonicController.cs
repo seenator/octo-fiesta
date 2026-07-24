@@ -1346,38 +1346,17 @@ public class SubsonicController : ControllerBase
         {
             var format = Request.Query["f"].ToString().ToLower() == "json" ? "json" : "xml";
     
-            // 1. Resolve the current track to get its Artist and Title
-            // (Octo-fiesta proxy or local library lookup)
-            var trackInfo = await _localLibraryService.GetTrackByIdAsync(id);
-            if (trackInfo == null || string.IsNullOrEmpty(trackInfo.Artist) || string.IsNullOrEmpty(trackInfo.Title))
+            // Let your backend Subsonic server handle the heavy lifting for radio/similar tracks,
+            // ensuring full compatibility with your music client's expected output format.
+            var proxyResult = await _proxyService.RelayRequestAsync($"getSimilarSongs.view?id={id}&count={count}", Request, HttpContext.RequestAborted);
+            
+            if (proxyResult.StatusCode >= 400)
             {
-                return _responseBuilder.CreateError(format, 0, "Track not found for radio generation.");
+                return StatusCode(proxyResult.StatusCode);
             }
     
-            // 2. Fetch similar song names from Last.fm using your service
-            var similarTrackNames = await _lastFmService.GetSimilarTracksAsync(trackInfo.Artist, trackInfo.Title);
-            int limit = count ?? 20;
-    
-            // 3. Find matching tracks inside your local library that correspond to the Last.fm recommendations
-            var resolvedSongs = new List<SongDto>();
-            foreach (var sim in similarTrackNames.Take(limit * 2)) // Fetch extra to account for missing local files
-            {
-                var matches = await _localLibraryService.SearchTracksAsync(sim.Artist, sim.Title, 1);
-                if (matches != null && matches.Any())
-                {
-                    resolvedSongs.Add(matches.First());
-                    if (resolvedSongs.Count >= limit) break;
-                }
-            }
-    
-            // 4. Fallback: If local matching is tight, ask Navidrome's backend proxy for random tracks so it never breaks
-            if (!resolvedSongs.Any())
-            {
-                return await _proxyService.RelayRequestAsync($"getSimilarSongs.view?id={id}&count={count}", Request, HttpContext.RequestAborted);
-            }
-    
-            // 5. Build and output the proper Subsonic response containing the randomized similar tracks
-            return _responseBuilder.CreateSimilarSongsResponse(format, resolvedSongs);
+            var contentType = proxyResult.ContentType ?? "application/xml; charset=utf-8";
+            return File(proxyResult.Body, contentType);
         }
         catch (Exception ex)
         {
