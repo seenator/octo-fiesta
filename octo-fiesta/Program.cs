@@ -10,6 +10,7 @@ using octo_fiesta.Services.Validation;
 using octo_fiesta.Services.Subsonic;
 using octo_fiesta.Services.Common;
 using octo_fiesta.Middleware;
+using OctoFiesta.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
