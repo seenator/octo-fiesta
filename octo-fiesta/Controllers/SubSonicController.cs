@@ -14,6 +14,7 @@ using octo_fiesta.Services.Local;
 using octo_fiesta.Services.Lyrics;
 using octo_fiesta.Services.SquidWTF;
 using octo_fiesta.Services.Subsonic;
+using OctoFiesta.Services;
 
 namespace octo_fiesta.Controllers;
 
