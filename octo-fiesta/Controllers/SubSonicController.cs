@@ -33,6 +33,7 @@ public class SubsonicController : ControllerBase
     private readonly ILyricsService? _lyricsService;
     private readonly ILogger<SubsonicController> _logger;
     private readonly IHostApplicationLifetime _hostApplicationLifetime;
+    private readonly LastFmService _lastFmService; // Added field
 
     public SubsonicController(
         IOptions<SubsonicSettings> subsonicSettings,
@@ -60,6 +61,7 @@ public class SubsonicController : ControllerBase
         _playlistSyncService = playlistSyncService;
         _lyricsService = lyricsService;
         _logger = logger;
+        _lastFmService = lastFmService; // Added assignment here
 
         if (string.IsNullOrWhiteSpace(_subsonicSettings.Url))
         {
@@ -1332,6 +1334,41 @@ public class SubsonicController : ControllerBase
         {
             var format = parameters.GetValueOrDefault("f", "xml");
             return _responseBuilder.CreateError(format, 0, $"Error connecting to Subsonic server: {ex.Message}");
+        }
+    }
+    [HttpGet("getSimilarSongs.view")]
+    [HttpGet("getSimilarSongs")]
+    public async Task<IActionResult> GetSimilarSongs([FromQuery] string id, [FromQuery] int? count)
+    {
+        try
+        {
+            // 1. Get the requested track's metadata using octo-fiesta's built-in metadata service
+            var trackMeta = await _metadataService.GetTrackMetadataAsync(id);
+            if (trackMeta == null || string.IsNullOrEmpty(trackMeta.Artist) || string.IsNullOrEmpty(trackMeta.Title))
+            {
+                var format = Request.Query["f"].ToString().ToLower() == "json" ? "json" : "xml";
+                return _responseBuilder.CreateError(format, 0, "Track not found or metadata unavailable for radio.");
+            }
+    
+            // 2. Fetch similar track names from Last.fm
+            var similarTracks = await _lastFmService.GetSimilarTracksAsync(trackMeta.Artist, trackMeta.Title);
+            
+            // Limit results if a count was requested
+            int limit = count ?? 20;
+            var selectedTracks = similarTracks.Take(limit).ToList();
+    
+            // 3. Build and return the Subsonic response using octo-fiesta's response builder
+            // (Note: Depending on your client, you'll map these text results into Octo-Fiesta's internal track model structures)
+            var formatType = Request.Query["f"].ToString().ToLower();
+            
+            // For now, returning an empty safe playlist response model or passing them to the response builder:
+            return _responseBuilder.CreateSimilarSongsResponse(formatType, selectedTracks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating similar songs radio queue.");
+            var format = Request.Query["f"].ToString().ToLower() == "json" ? "json" : "xml";
+            return _responseBuilder.CreateError(format, 0, $"Radio error: {ex.Message}");
         }
     }
 }
